@@ -2,31 +2,31 @@ using Gtk 4.0;
 using Adw 1;
 
 Gtk.Box launch_sidebar {
-  styles ["sidebar"];
+  styles ["sidebar"]
   orientation: vertical;
   width-request: 300;
   hexpand: false;
   valign: fill;
 
   Gtk.Box mode_bar {
-    styles ["mode-bar"];
+    styles ["mode-bar"]
     halign: center;
     spacing: 4;
 
     Gtk.Button mode_btn_0 {
       label: "正版";
       has-frame: false;
-      styles ["flat", "mode-btn", "mode-btn-active"];
+      styles ["flat", "mode-btn", "mode-btn-active"]
     }
     Gtk.Button mode_btn_1 {
       label: "离线";
       has-frame: false;
-      styles ["flat", "mode-btn"];
+      styles ["flat", "mode-btn"]
     }
     Gtk.Button mode_btn_2 {
       label: "第三方";
       has-frame: false;
-      styles ["flat", "mode-btn"];
+      styles ["flat", "mode-btn"]
     }
   }
 
@@ -48,7 +48,7 @@ Gtk.Box launch_sidebar {
 
   Gtk.Label username_label {
     label: "Steve";
-    styles ["username"];
+    styles ["username"]
     halign: center;
     margin-top: 12;
   }
@@ -58,7 +58,7 @@ Gtk.Box launch_sidebar {
   }
 
   Gtk.Box launch_placeholder {
-    styles ["launch-placeholder"];
+    styles ["launch-placeholder"]
     halign: fill;
     margin-start: 20;
     margin-end: 20;
@@ -67,7 +67,7 @@ Gtk.Box launch_sidebar {
   }
 
   Gtk.Box version_row {
-    styles ["version-row"];
+    styles ["version-row"]
     halign: fill;
     margin-start: 20;
     margin-end: 20;
