@@ -2,7 +2,7 @@
 
 Plain Craft Launcher 的 GTK4 + libadwaita 跨平台社区移植版。
 
-PCL 是最受欢迎的 Minecraft Java Edition 启动器之一，原版（PCL-CE）使用 VB.NET / WPF 编写，仅支持 Windows。
+PCL 是最受欢迎的 Minecraft Java Edition 启动器之一，PCL-CE 使用 C# .NET 编写，仅支持 Windows。
 
 本项目尝试用 C++17 和 GTK 生态（GTK4 / libadwaita / libsoup）重新实现核心功能，目标是在 Linux、Windows（MSYS2）、macOS 上获得原生体验。
 
