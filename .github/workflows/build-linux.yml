@@ -30,13 +30,3 @@ jobs:
           path: |
             ./build/pcl-cgre
             ./build/pcl-cgre_debug
-
-      - name: create release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: |
-            ./build/pcl-cgre
-            ./build/pcl-cgre_debug
-        env:
-          GITHUB_TOKEN: ${{ secrets.gh_TOKEN }}
