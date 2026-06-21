@@ -3,7 +3,6 @@
 #include <nlohmann/json.hpp>
 #include <mutex>
 #include <string>
-#include <functional>
 
 namespace pcl {
 
@@ -72,12 +71,6 @@ public:
     const nlohmann::json& raw() const { return m_config; }
     std::string config_path() const;
 
-    /** 设置保存完成回调 (用于展示 Toast) */
-    void set_save_callback(std::function<void(bool)> cb) { m_save_cb = std::move(cb); }
-
-    /** 设置回滚回调 (用于重建 UI) */
-    void set_rollback_callback(std::function<void()> cb) { m_rollback_cb = std::move(cb); }
-
     /** 页面切换时调用 — 静默保存，不弹 Toast */
     void save_silent();
 
@@ -105,8 +98,6 @@ private:
     bool m_dirty = false;
     bool m_backup_saved = false;
     unsigned int m_save_timer = 0;
-    std::function<void(bool)> m_save_cb;
-    std::function<void()> m_rollback_cb;
 };
 
 }  // namespace pcl

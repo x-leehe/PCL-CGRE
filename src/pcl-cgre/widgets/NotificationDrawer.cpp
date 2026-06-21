@@ -1,4 +1,5 @@
 #include "widgets/NotificationDrawer.hpp"
+#include "app/NavigationController.hpp"
 #include "core/Colors.hpp"
 #include "util/IconHelper.hpp"
 
@@ -554,27 +555,11 @@ namespace pcl
                 }
             }), list);
 
-        /* 关闭按钮 → 收起抽屉 (通过 window 上的 "notif-*" 数据) */
+        /* 关闭按钮 → 委托 NavigationController 收起抽屉 */
         g_signal_connect(close_btn, "clicked",
-                         G_CALLBACK(+[](GtkWidget *w, gpointer)
-                                    {
-                                        GtkWidget *win = GTK_WIDGET(gtk_widget_get_root(w));
-                                        GtkWidget *rev = static_cast<GtkWidget *>(
-                                            g_object_get_data(G_OBJECT(win), "notif-revealer"));
-                                        GtkWidget *bd = static_cast<GtkWidget *>(
-                                            g_object_get_data(G_OBJECT(win), "notif-backdrop"));
-                                        GtkWidget *ow = static_cast<GtkWidget *>(
-                                            g_object_get_data(G_OBJECT(win), "notif-outer"));
-                                        if (rev)
-                                        {
-                                            gtk_revealer_set_reveal_child(GTK_REVEALER(rev), FALSE);
-                                            g_object_set_data(G_OBJECT(win), "notif-open", GINT_TO_POINTER(0));
-                                        }
-                                        if (bd)
-                                            gtk_widget_set_visible(bd, FALSE);
-                                        if (ow)
-                                            gtk_widget_set_can_target(ow, FALSE);
-                                    }),
+                         G_CALLBACK(+[](GtkWidget*, gpointer) {
+                             NavigationController::instance().close_notification_drawer();
+                         }),
                          nullptr);
 
         return outer;

@@ -1,4 +1,5 @@
 #include "core/ConfigManager.hpp"
+#include "core/ConfigEvent.hpp"
 #include "core/Log.hpp"
 
 #include <fstream>
@@ -341,8 +342,7 @@ void ConfigManager::schedule_save()
         auto* mgr = static_cast<ConfigManager*>(data);
         mgr->m_save_timer = 0;
         mgr->save();
-        if (mgr->m_save_cb)
-            mgr->m_save_cb(true);  // true = show toast
+        ConfigEvent::instance().emit_saved(true);  // show toast
         return G_SOURCE_REMOVE;
     };
     m_save_timer = g_timeout_add(1600, on_timeout, this);
@@ -355,8 +355,7 @@ void ConfigManager::save_silent()
         m_save_timer = 0;
     }
     save();
-    if (m_save_cb)
-        m_save_cb(false);  // false = silent, no toast
+    ConfigEvent::instance().emit_saved(false);  // silent, no toast
 }
 
 void ConfigManager::clear_backup()
@@ -385,7 +384,7 @@ void ConfigManager::rollback()
     }
     if (need_save) {
         save();
-        if (m_rollback_cb) m_rollback_cb();
+        ConfigEvent::instance().emit_rolled_back();
     }
 }
 

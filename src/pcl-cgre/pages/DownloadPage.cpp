@@ -1,4 +1,5 @@
 #include "pages/DownloadPage.hpp"
+#include "app/NavigationController.hpp"
 #include "widgets/ResourceItem.hpp"
 #include "pages/ResourceDetailPage.hpp"
 #include "pages/McVersionDetailPage.hpp"
@@ -1968,14 +1969,12 @@ GtkWidget* build_download_page()
     /* 也挂到外层 page 供 create_main_window 的 AdwViewStack 信号使用 */
     g_object_set_data(G_OBJECT(page), "mc_widgets", w);
     g_object_set_data(G_OBJECT(page), "mc_scroll", mc_scroll);
-    /* 内部引用 — 供详情页导航使用 */
+    /* 内部引用 — 供详情页导航使用 (NavigationController + 向后兼容) */
+    GtkWidget* sep = gtk_widget_get_next_sibling(left);
+    NavigationController::instance().register_download(left, sep, stack);
     g_object_set_data(G_OBJECT(page), "dl-stack", stack);
     g_object_set_data(G_OBJECT(page), "dl-sidebar", left);
-    /* separator 在 left 和 stack 之间 (build_two_panel_page 的子控件 #1) */
-    {
-        GtkWidget* sep = gtk_widget_get_next_sibling(left);
-        if (sep) g_object_set_data(G_OBJECT(page), "dl-sep", sep);
-    }
+    if (sep) g_object_set_data(G_OBJECT(page), "dl-sep", sep);
     return page;
 }
 

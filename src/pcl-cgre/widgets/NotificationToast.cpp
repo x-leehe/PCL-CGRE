@@ -1,4 +1,5 @@
 #include "widgets/NotificationToast.hpp"
+#include "app/NavigationController.hpp"
 #include "core/Colors.hpp"
 #include "util/IconHelper.hpp"
 
@@ -240,11 +241,12 @@ void show_toast(GtkWindow* win, const ToastConfig& cfg)
             G_CALLBACK(+[](GtkGesture*, int, double, double, gpointer d) {
                 auto* td2 = static_cast<ToastData*>(d);
                 if (td2->type != "fatal") {
-                    /* 安全模式通知 → 导航到 CrashSpy Launcher 崩溃 */
+                    /* 安全模式通知 → 导航到 CrashSpy Launcher 崩溃 (第 6 项) */
                     if (td2->title == "已进入安全模式" && td2->window) {
-                        GObject* win = G_OBJECT(td2->window);
-                        GtkWidget* htabs = static_cast<GtkWidget*>(
-                            g_object_get_data(win, "header-tabs"));
+                        auto& nav = NavigationController::instance();
+
+                        /* 1. 切换到 More 顶层页面 */
+                        GtkWidget* htabs = nav.header_tabs();
                         if (htabs) {
                             for (GtkWidget* tab = gtk_widget_get_first_child(htabs);
                                  tab; tab = gtk_widget_get_next_sibling(tab)) {
@@ -256,44 +258,64 @@ void show_toast(GtkWindow* win, const ToastConfig& cfg)
                                 }
                             }
                         }
-                        AdwViewStack* main_stk = ADW_VIEW_STACK(
-                            g_object_get_data(win, "main-stack"));
-                        if (main_stk) {
-                            GtkWidget* mp = adw_view_stack_get_child_by_name(
-                                main_stk, "more");
-                            if (mp) {
-                                GtkWidget* mid_stk = static_cast<GtkWidget*>(
-                                    g_object_get_data(G_OBJECT(mp), "more-mid-stack"));
-                                GtkWidget* rstk = static_cast<GtkWidget*>(
-                                    g_object_get_data(G_OBJECT(mp), "more-right-stack"));
-                                if (mid_stk && rstk) {
-                                    gtk_stack_set_visible_child_name(
-                                        GTK_STACK(mid_stk), "mid-crash");
-                                    GtkWidget* cn = gtk_stack_get_child_by_name(
-                                        GTK_STACK(mid_stk), "mid-crash");
-                                    if (cn) {
-                                        GtkWidget* r6 = gtk_widget_get_first_child(cn);
-                                        for (int k = 0; k < 5 && r6; k++)
-                                            r6 = gtk_widget_get_next_sibling(r6);
-                                        if (r6) {
-                                            const char* rp = static_cast<const char*>(
-                                                g_object_get_data(G_OBJECT(r6), "right-page"));
-                                            GtkWidget* ml = static_cast<GtkWidget*>(
-                                                g_object_get_data(G_OBJECT(r6), "mid-list"));
-                                            if (rp)
-                                                gtk_stack_set_visible_child_name(
-                                                    GTK_STACK(rstk), rp);
-                                            if (ml) {
-                                                for (GtkWidget* s = gtk_widget_get_first_child(ml);
-                                                     s; s = gtk_widget_get_next_sibling(s)) {
-                                                    if (!gtk_widget_has_css_class(s, "nav-item")) continue;
-                                                    if (s == r6)
-                                                        gtk_widget_add_css_class(s, "nav-item-active");
-                                                    else
-                                                        gtk_widget_remove_css_class(s, "nav-item-active");
-                                                }
-                                            }
+
+                        /* 2. 获取 More 页面的内部 mid / right stack */
+                        GtkWidget* mid_stk = nav.more_mid();
+                        GtkWidget* right_stk = nav.more_right();
+
+                        if (mid_stk && right_stk) {
+                            /* 3. 切换 mid stack 到 CrashSpy */
+                            gtk_stack_set_visible_child_name(
+                                GTK_STACK(mid_stk), "mid-crash");
+
+                            /* 4. 找到 Launcher 崩溃对应的 mid-crash 子项 (第 6 项, index 5) */
+                            GtkWidget* cn = gtk_stack_get_child_by_name(
+                                GTK_STACK(mid_stk), "mid-crash");
+                            if (cn) {
+                                GtkWidget* r6 = gtk_widget_get_first_child(cn);
+                                for (int k = 0; k < 5 && r6; k++)
+                                    r6 = gtk_widget_get_next_sibling(r6);
+
+                                if (r6 && gtk_widget_has_css_class(r6, "nav-item")) {
+                                    const char* rp = static_cast<const char*>(
+                                        g_object_get_data(G_OBJECT(r6), "right-page"));
+                                    GtkWidget* ml = static_cast<GtkWidget*>(
+                                        g_object_get_data(G_OBJECT(r6), "mid-list"));
+
+                                    /* 5. 切换 right stack 到目标页面 */
+                                    if (rp)
+                                        gtk_stack_set_visible_child_name(
+                                            GTK_STACK(right_stk), rp);
+
+                                    /* 6. 高亮 mid-crash 子项 (互斥) */
+                                    if (ml) {
+                                        for (GtkWidget* s = gtk_widget_get_first_child(ml);
+                                             s; s = gtk_widget_get_next_sibling(s)) {
+                                            if (!gtk_widget_has_css_class(s, "nav-item")) continue;
+                                            if (s == r6)
+                                                gtk_widget_add_css_class(s, "nav-item-active");
+                                            else
+                                                gtk_widget_remove_css_class(s, "nav-item-active");
                                         }
+                                    }
+                                }
+                            }
+
+                            /* 7. 高亮 More 左栏的 CrashSpy 项 */
+                            GtkWidget* left_nav = nav.more_left();
+                            if (left_nav) {
+                                GtkWidget* inner = gtk_scrolled_window_get_child(
+                                    GTK_SCROLLED_WINDOW(left_nav));
+                                if (inner) {
+                                    for (GtkWidget* s = gtk_widget_get_first_child(inner);
+                                         s; s = gtk_widget_get_next_sibling(s)) {
+                                        if (!gtk_widget_has_css_class(s, "nav-item")) continue;
+                                        const char* mp = static_cast<const char*>(
+                                            g_object_get_data(G_OBJECT(s), "mid-page"));
+                                        if (mp && g_strcmp0(mp, "mid-crash") == 0)
+                                            gtk_widget_add_css_class(s, "nav-item-active");
+                                        else
+                                            gtk_widget_remove_css_class(s, "nav-item-active");
                                     }
                                 }
                             }

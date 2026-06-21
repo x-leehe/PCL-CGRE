@@ -1,5 +1,6 @@
 #include "pages/MorePage.hpp"
 #include "pages/LaunchPage.hpp"
+#include "app/NavigationController.hpp"
 #include "core/Colors.hpp"
 #include "util/IconHelper.hpp"
 #include "widgets/NotificationToast.hpp"
@@ -966,7 +967,8 @@ GtkWidget* build_more_page()
     gtk_widget_set_hexpand(right_stack, TRUE);
     gtk_box_append(GTK_BOX(panel), right_stack);
 
-    /* 存储关键控件, 供外部导航到特定子项 */
+    /* 存储关键控件 — NavigationController 集中管理 + 向后兼容 */
+    NavigationController::instance().register_more(left, mid_stack, right_stack);
     g_object_set_data(G_OBJECT(panel), "more-left-nav", left);
     g_object_set_data(G_OBJECT(panel), "more-mid-stack", mid_stack);
     g_object_set_data(G_OBJECT(panel), "more-right-stack", right_stack);

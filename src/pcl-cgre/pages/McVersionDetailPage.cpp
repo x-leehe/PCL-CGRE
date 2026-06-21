@@ -1,4 +1,5 @@
 #include "pages/McVersionDetailPage.hpp"
+#include "app/NavigationController.hpp"
 #include "util/IconHelper.hpp"
 #include "network/LoaderFetcher.hpp"
 #include "network/ResourceFetcher.hpp"
@@ -763,22 +764,16 @@ void navigate_to_mc_version_detail(GtkWidget*        trigger_widget,
                                    const std::string& version_id,
                                    const std::string& version_type)
 {
-    GObject* win = G_OBJECT(gtk_widget_get_root(trigger_widget));
-    if (!win) return;
+    auto& nav = NavigationController::instance();
+    if (!nav.window()) return;
 
-    auto* hdr = static_cast<GtkWidget*>(
-        g_object_get_data(win, "header-bar"));
-    auto* back_nav = static_cast<GtkWidget*>(
-        g_object_get_data(win, "back-nav"));
-    auto* main_stk = static_cast<AdwViewStack*>(
-        g_object_get_data(win, "main-stack"));
-    if (!hdr || !back_nav || !main_stk) return;
+    AdwViewStack* main_stk = nav.main_stack();
+    if (!main_stk) return;
 
     GtkWidget* dl_page = adw_view_stack_get_child_by_name(main_stk, "download");
     if (!dl_page) return;
 
-    auto* dl_stk = static_cast<GtkWidget*>(
-        g_object_get_data(G_OBJECT(dl_page), "dl-stack"));
+    GtkWidget* dl_stk = nav.dl_stack();
     if (!dl_stk) return;
 
     /* 保存当前页面名称 (供返回时恢复) */
@@ -788,37 +783,8 @@ void navigate_to_mc_version_detail(GtkWidget*        trigger_widget,
                                g_strdup(cur_name), g_free);
     }
 
-    /* 隐藏 tabs + "PCL-CGRE", pack back_nav 到左侧 */
-    auto* tabs = static_cast<GtkWidget*>(
-        g_object_get_data(win, "header-tabs"));
-    if (tabs)
-        gtk_widget_set_visible(tabs, FALSE);
-
-    /* 先确保 back_nav 不在 header bar 中（避免重复 pack 崩溃） */
-    if (gtk_widget_get_parent(back_nav))
-        adw_header_bar_remove(ADW_HEADER_BAR(hdr), back_nav);
-
-    GtkWidget* app_title = static_cast<GtkWidget*>(
-        g_object_get_data(win, "app-title"));
-    if (app_title && gtk_widget_get_parent(app_title)) {
-        g_object_ref(app_title);
-        adw_header_bar_remove(ADW_HEADER_BAR(hdr), app_title);
-    }
-    adw_header_bar_pack_start(ADW_HEADER_BAR(hdr), back_nav);
-
-    /* 隐藏左侧导航栏 + 分隔线 */
-    GtkWidget* sidebar = static_cast<GtkWidget*>(
-        g_object_get_data(G_OBJECT(dl_page), "dl-sidebar"));
-    GtkWidget* sep = static_cast<GtkWidget*>(
-        g_object_get_data(G_OBJECT(dl_page), "dl-sep"));
-    if (sidebar) gtk_widget_set_visible(sidebar, FALSE);
-    if (sep)     gtk_widget_set_visible(sep, FALSE);
-
-    /* 设置标题栏中的版本名称 */
-    GtkWidget* title_lbl = static_cast<GtkWidget*>(
-        g_object_get_data(G_OBJECT(back_nav), "title-lbl"));
-    if (title_lbl && GTK_IS_LABEL(title_lbl))
-        gtk_label_set_text(GTK_LABEL(title_lbl), version_id.c_str());
+    /* 委托 NavigationController 处理 header/sidebar 切换 */
+    nav.enter_detail_view(version_id);
 
     /* 切换到 MC 详情页 */
     gtk_stack_set_visible_child_name(GTK_STACK(dl_stk), "mc-detail");
