@@ -25,19 +25,16 @@ using json = nlohmann::json;
 namespace {
 
 /** Percent-encode a string using libcurl.
- *  Reuses a thread-local CURL handle (one per worker thread, released at
- *  thread exit) to avoid an easy_init/easy_cleanup pair on every URL
- *  component we encode. */
+ *  Reuses the shared thread-local transfer handle (pcl::util::tl_handle) so
+ *  there is one CURL handle per worker thread for both transfers and
+ *  escaping, and curl_global_init() is guaranteed to have run first.
+ *  curl_easy_escape() sets no transfer options, so sharing is safe. */
 inline std::string url_encode(const std::string& s)
 {
     if (s.empty()) return s;
-    struct EscHandle {
-        CURL* h = curl_easy_init();
-        ~EscHandle() { if (h) curl_easy_cleanup(h); }
-    };
-    static thread_local EscHandle esc;
-    if (!esc.h) return s;
-    char* enc = curl_easy_escape(esc.h, s.c_str(), static_cast<int>(s.length()));
+    CURL* curl = pcl::util::tl_handle();
+    if (!curl) return s;
+    char* enc = curl_easy_escape(curl, s.c_str(), static_cast<int>(s.length()));
     std::string result(enc ? enc : s);
     if (enc) curl_free(enc);
     return result;
@@ -576,13 +573,31 @@ namespace {
 constexpr int         ICON_PARALLEL     = 6;   // worker threads
 constexpr int         ICON_MAX_BYTES    = 1'000'000;
 constexpr int         REQUEST_TIMEOUT_S = 10;
-constexpr const char* CACHE_DIR         = "/tmp/PCL-CGRE/Icons";
 constexpr auto        ICON_DEADLINE     = std::chrono::seconds(60);
 
-/* ── djb2 hash (deterministic across runs) ──────────────────────────── */
-uint32_t hash_url(const std::string& url)
+/* ── Per-user icon cache directory ──────────────────────────────────────
+ *  Prefer $XDG_CACHE_HOME, then ~/.cache; fall back to /tmp only when the
+ *  environment exposes neither. A fixed /tmp path collides between users on
+ *  a shared host (the first user owns it; others silently fail to write and
+ *  re-download every icon). Resolved once and cached. */
+const std::string& cache_dir()
 {
-    uint32_t h = 5381;
+    static const std::string dir = []() -> std::string {
+        const char* xdg = std::getenv("XDG_CACHE_HOME");
+        if (xdg && *xdg) return std::string(xdg) + "/PCL-CGRE/Icons";
+        const char* home = std::getenv("HOME");
+        if (home && *home) return std::string(home) + "/.cache/PCL-CGRE/Icons";
+        return "/tmp/PCL-CGRE/Icons";
+    }();
+    return dir;
+}
+
+/* ── djb2 hash, 64-bit (deterministic across runs) ──────────────────────
+ *  64 bits keeps cache-filename collisions (→ wrong icon served) negligible
+ *  over the lifetime of the on-disk cache. */
+uint64_t hash_url(const std::string& url)
+{
+    uint64_t h = 5381;
     for (unsigned char c : url) h = ((h << 5) + h) + c;
     return h;
 }
@@ -601,9 +616,10 @@ size_t icon_write_cb(char* ptr, size_t size, size_t nmemb, void* userdata)
 
 std::string cache_path_for(const std::string& url)
 {
-    char hex[16];
-    snprintf(hex, sizeof(hex), "%08x", hash_url(url));
-    return std::string(CACHE_DIR) + "/" + hex + ".png";
+    char hex[20];
+    snprintf(hex, sizeof(hex), "%016llx",
+             static_cast<unsigned long long>(hash_url(url)));
+    return cache_dir() + "/" + hex + ".png";
 }
 
 /* ── Ensure cache directory exists (idempotent, thread-safe via call_once) ── */
@@ -612,9 +628,9 @@ void ensure_cache_dir()
     static std::once_flag dir_flag;
     std::call_once(dir_flag, []() {
         std::error_code ec;
-        std::filesystem::create_directories(CACHE_DIR, ec);
+        std::filesystem::create_directories(cache_dir(), ec);
         if (!ec)
-            LOG_DBG("ResourceFetcher: cache dir %s ready", CACHE_DIR);
+            LOG_DBG("ResourceFetcher: cache dir %s ready", cache_dir().c_str());
     });
 }
 
@@ -793,6 +809,11 @@ void load_icons_async(std::vector<std::string> urls, IconCallback on_icon)
              "%d workers", urls.size(), non_empty, ICON_PARALLEL);
 
     if (urls.empty()) return;
+
+    /* Initialise libcurl once, on this (main) thread, before any icon worker
+     * thread calls curl_easy_init() — keeps the implicit global init off the
+     * worker threads where it would race. */
+    pcl::util::ensure_curl_global();
 
     ensure_cache_dir();
 

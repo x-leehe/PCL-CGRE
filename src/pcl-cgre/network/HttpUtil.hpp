@@ -18,6 +18,21 @@ namespace pcl::util {
  *  until the system TCP timeout fires (~30–120 s). */
 constexpr int HTTP_SYNC_TIMEOUT_S = 10;
 
+/** Run curl_global_init() exactly once for the whole process, before any
+ *  curl_easy_init()/curl_easy_escape() on any thread.
+ *
+ *  The once_flag is a local static of this *named* inline function, so it
+ *  has a single shared instance across every translation unit. An
+ *  anonymous-namespace flag would instead be per-TU, letting two TUs race
+ *  on libcurl's (non-thread-safe) implicit global init on first use. */
+inline void ensure_curl_global()
+{
+    static std::once_flag flag;
+    std::call_once(flag, []() {
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+    });
+}
+
 namespace {
 
 /** libcurl write callback — appends received data to a std::string. */
@@ -39,14 +54,11 @@ inline size_t write_callback(char* ptr, size_t size, size_t nmemb, void* userdat
  *  short-lived, detached fetch threads — no handle, socket or
  *  connection-cache leak accumulates over the lifetime of the process.
  *
- *  curl_global_init() is called exactly once before the first handle is
- *  created — it is thread-safe per libcurl documentation. */
+ *  curl_global_init() is guaranteed (via ensure_curl_global) to have run
+ *  exactly once before the first handle is created. */
 inline CURL* tl_handle()
 {
-    static std::once_flag init_flag;
-    std::call_once(init_flag, []() {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-    });
+    ensure_curl_global();
 
     /* RAII owner: ~Handle() fires on thread exit and releases the handle
      * (and its pooled connections / file descriptors). */

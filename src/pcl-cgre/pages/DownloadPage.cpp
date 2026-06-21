@@ -56,7 +56,7 @@ struct ResourceWidgets {
     GtkWidget* spinner;        // GtkSpinner — 居中在结果区
     GtkWidget* hist_revealer;  // GtkRevealer — 历史记录
     GtkWidget* hist_list;      // GtkListBox inside revealer
-    std::vector<std::string> search_history;  // 最近 ≤8 条
+    std::vector<std::string> search_history;  // 最近 ≤MAX_SEARCH_HISTORY 条
     resource::ProjectType project_type;  // 资源类别
     bool default_loaded = false;         // 是否已触发过默认浏览加载
     bool history_triggers_search = true; // 点击历史项是否触发搜索 (收藏页为 false)
@@ -72,6 +72,7 @@ struct ResourceWidgets {
     GtkWidget* btn_next   = nullptr;
     GtkWidget* btn_last   = nullptr;
     static constexpr int page_size = 20;
+    static constexpr size_t MAX_SEARCH_HISTORY = 8;  // 搜索历史保留条数
 };
 
 /* ── 触发资源搜索 & 翻页 ─────────────────────────────────────────────── */
@@ -847,12 +848,13 @@ void do_resource_search(ResourceWidgets* rw)
         gtk_widget_set_visible(rw->spinner, TRUE);
     }
 
-    /* 保存到搜索历史 (最多 8 条, 去重) */
+    /* 保存到搜索历史 (去重, 最多 MAX_SEARCH_HISTORY 条) */
     if (!f.query.empty()) {
         auto& h = rw->search_history;
         h.erase(std::remove(h.begin(), h.end(), f.query), h.end());
         h.insert(h.begin(), f.query);
-        if (h.size() > 8) h.resize(8);
+        if (h.size() > ResourceWidgets::MAX_SEARCH_HISTORY)
+            h.resize(ResourceWidgets::MAX_SEARCH_HISTORY);
     }
 
     /* 启动后台抓取 */
