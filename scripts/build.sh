@@ -30,6 +30,9 @@ if [ "${BUILD_DIR}" != "build" ]; then
     cp "${BUILD_DIR}/pcl-cgre.gresource" build/pcl-cgre.gresource
     rm -rf build/resources
     cp -r "${BUILD_DIR}/resources" build/resources
+    rm -rf build-debug
 fi
+
+rm -rf build/pcl-cgre_release
 
 echo "==> 完成: ./build/${DST_NAME}"
