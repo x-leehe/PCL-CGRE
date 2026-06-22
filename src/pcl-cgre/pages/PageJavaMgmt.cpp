@@ -4,12 +4,102 @@
 #include "util/IconHelper.hpp"
 #include "widgets/FormWidgets.hpp"
 
-#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
+#include <array>
 #include <gtk/gtk.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/wait.h>
+#endif
+
 namespace pcl {
+
+namespace {
+
+std::string exec_and_capture(const std::string& exe, const std::vector<std::string>& args)
+{
+#ifdef _WIN32
+    std::string cmdline = "\"" + exe + "\"";
+    for (auto& a : args) {
+        cmdline += " \"" + a + "\"";
+    }
+
+    HANDLE hStdoutRd, hStdoutWr;
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), nullptr, TRUE };
+    if (!CreatePipe(&hStdoutRd, &hStdoutWr, &sa, 0))
+        return {};
+    if (!SetHandleInformation(hStdoutRd, HANDLE_FLAG_INHERIT, 0)) {
+        CloseHandle(hStdoutRd); CloseHandle(hStdoutWr);
+        return {};
+    }
+
+    STARTUPINFOA si = {};
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = hStdoutWr;
+    si.hStdError = hStdoutWr;
+
+    PROCESS_INFORMATION pi = {};
+    BOOL ok = CreateProcessA(
+        nullptr, &cmdline[0], nullptr, nullptr, TRUE,
+        CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi);
+    CloseHandle(hStdoutWr);
+    if (!ok) {
+        CloseHandle(hStdoutRd);
+        return {};
+    }
+    CloseHandle(pi.hThread);
+
+    std::string result;
+    char buf[4096];
+    DWORD read;
+    while (ReadFile(hStdoutRd, buf, sizeof(buf), &read, nullptr) && read > 0)
+        result.append(buf, read);
+    CloseHandle(hStdoutRd);
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hProcess);
+    return result;
+#else
+    int fds[2];
+    if (pipe(fds) == -1) return {};
+
+    pid_t pid = fork();
+    if (pid == -1) {
+        close(fds[0]); close(fds[1]);
+        return {};
+    }
+
+    if (pid == 0) {
+        close(fds[0]);
+        dup2(fds[1], STDOUT_FILENO);
+        dup2(fds[1], STDERR_FILENO);
+        close(fds[1]);
+
+        std::vector<const char*> argv = { exe.c_str() };
+        for (auto& a : args) argv.push_back(a.c_str());
+        argv.push_back(nullptr);
+        execvp(exe.c_str(), const_cast<char* const*>(argv.data()));
+        _exit(127);
+    }
+
+    close(fds[1]);
+    std::string result;
+    char buf[4096];
+    ssize_t n;
+    while ((n = read(fds[0], buf, sizeof(buf))) > 0)
+        result.append(buf, n);
+    close(fds[0]);
+    waitpid(pid, nullptr, 0);
+    return result;
+#endif
+}
+
+}  // anonymous namespace
 
 /* ============================================================================
  * P1 — Java 管理 (工具栏 + 动态列表)
@@ -175,31 +265,25 @@ GtkWidget* build_page_java_mgmt()
                     std::string java_path(path);
                     g_free(path);
 
-                    // 检测 Java 版本
+                    // 检测 Java 版本 (安全启动, 不经过 shell)
                     std::string version_name = "Java";
-                    std::string cmd = "\"" + java_path + "\" --version 2>&1";
-                    FILE* p = popen(cmd.c_str(), "r");
-                    if (p) {
-                        char buf[256];
-                        if (fgets(buf, sizeof(buf), p)) {
-                            std::string s(buf);
-                            auto pos = s.find("\"");
-                            if (pos != std::string::npos) {
-                                auto end = s.find("\"", pos + 1);
-                                if (end != std::string::npos)
-                                    version_name = s.substr(pos + 1, end - pos - 1);
-                            } else {
-                                auto vpos = s.find("version ");
-                                if (vpos != std::string::npos) {
-                                    auto ver = s.substr(vpos + 8);
-                                    auto sp = ver.find(' ');
-                                    if (sp != std::string::npos)
-                                        ver = ver.substr(0, sp);
-                                    version_name = "Java " + ver;
-                                }
+                    std::string out = exec_and_capture(java_path, {"--version"});
+                    if (!out.empty()) {
+                        auto pos = out.find("\"");
+                        if (pos != std::string::npos) {
+                            auto end = out.find("\"", pos + 1);
+                            if (end != std::string::npos)
+                                version_name = out.substr(pos + 1, end - pos - 1);
+                        } else {
+                            auto vpos = out.find("version ");
+                            if (vpos != std::string::npos) {
+                                auto ver = out.substr(vpos + 8);
+                                auto sp = ver.find(' ');
+                                if (sp != std::string::npos)
+                                    ver = ver.substr(0, sp);
+                                version_name = "Java " + ver;
                             }
                         }
-                        pclose(p);
                     }
 
                     auto& cfg = ConfigManager::instance();

@@ -15,6 +15,13 @@ pkg_check_modules(LIBCURL REQUIRED libcurl)
 # ── Blueprint UI compilation ──────────────────────────────────────────────
 find_program(BLUEPRINT_COMPILER blueprint-compiler REQUIRED)
 
+# On Windows/MSYS2, blueprint-compiler is a Python script without .exe,
+# which can't be invoked directly by cmd.exe/nmake.  Prepend python3.
+if(WIN32 AND NOT BLUEPRINT_COMPILER MATCHES "\\.exe$")
+    find_program(PYTHON3 python3 REQUIRED)
+    set(BLUEPRINT_COMPILER ${PYTHON3} ${BLUEPRINT_COMPILER})
+endif()
+
 file(GLOB BLUEPRINT_FILES ${CMAKE_SOURCE_DIR}/data/ui/*.blp)
 set(UI_DEST_DIR ${CMAKE_BINARY_DIR}/data/ui)
 file(MAKE_DIRECTORY ${UI_DEST_DIR})
@@ -101,13 +108,11 @@ target_include_directories(pcl-cgre PRIVATE
     ${LIBCURL_INCLUDE_DIRS}
 )
 
-target_compile_options(pcl-cgre PRIVATE
-    -Wall
-    -Wextra
-    -Wpedantic
-    ${GTK4_CFLAGS_OTHER}
-    ${LIBADWAITA_CFLAGS_OTHER}
-)
+if(MSVC)
+    target_compile_options(pcl-cgre PRIVATE /W4 ${GTK4_CFLAGS_OTHER} ${LIBADWAITA_CFLAGS_OTHER})
+else()
+    target_compile_options(pcl-cgre PRIVATE -Wall -Wextra -Wpedantic ${GTK4_CFLAGS_OTHER} ${LIBADWAITA_CFLAGS_OTHER})
+endif()
 
 target_link_libraries(pcl-cgre
     pclcore_objs

@@ -1,0 +1,65 @@
+name: build-windows
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sys: mingw64, env: x86_64 }
+          - { sys: ucrt64,  env: ucrt-x86_64 }
+          - { sys: clang64, env: clang-x86_64 }
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v7
+
+      - name: setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.sys }}
+          update: true
+          install: >-
+            mingw-w64-${{ matrix.env }}-gtk4
+            mingw-w64-${{ matrix.env }}-libadwaita
+            mingw-w64-${{ matrix.env }}-fontconfig
+            mingw-w64-${{ matrix.env }}-libsoup3
+            mingw-w64-${{ matrix.env }}-curl
+            mingw-w64-${{ matrix.env }}-json-glib
+            mingw-w64-${{ matrix.env }}-nlohmann-json
+            mingw-w64-${{ matrix.env }}-gcc
+            mingw-w64-${{ matrix.env }}-cmake
+            mingw-w64-${{ matrix.env }}-make
+            mingw-w64-${{ matrix.env }}-blueprint-compiler
+            mingw-w64-${{ matrix.env }}-toolchain
+
+      - name: build
+        env:
+          PYTHONUTF8: 1
+        run: |
+          export PATH="/${{ matrix.sys }}/bin:$PATH"
+          ./scripts/build.sh
+          ./scripts/build.sh Debug
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pcl-cgre_${{ matrix.sys }}_release
+          path: |
+            ./build/pcl-cgre.exe
+            ./build/pcl-cgre.gresource
+            ./build/resources/
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: pcl-cgre_${{ matrix.sys }}_debug
+          path: |
+            ./build/pcl-cgre_debug.exe
+            ./build/pcl-cgre.gresource
+            ./build/resources/

@@ -13,8 +13,14 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
-#include <strings.h>
 #include <ctime>
+
+#ifdef _WIN32
+#include <string.h>
+#define strcasecmp _stricmp
+#else
+#include <strings.h>
+#endif
 #include <future>
 #include <string>
 #include <vector>

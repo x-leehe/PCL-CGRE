@@ -9,12 +9,12 @@
 namespace pcl {
 
 /**
- * 插件描述符 — dlopen 加载的单个插件
+ * 插件描述符 — 动态加载的单个插件 (.so / .dll)
  */
 struct PluginDescriptor {
     std::string name;           // 插件名称
     std::string description;    // 简短描述
-    std::string so_path;        // .so 文件完整路径
+    std::string plugin_path;    // 插件文件完整路径
     std::function<GtkWidget*()> create_page;  // 构建页面 widget
 
     /** for sort / dedup */
@@ -22,30 +22,30 @@ struct PluginDescriptor {
 };
 
 /**
- * 插件注册表 — 扫描 / 加载 / 管理共享对象 (.so) 插件
+ * 插件注册表 — 扫描 / 加载 / 管理共享对象 (.so / .dll) 插件
  *
  * 失败保护:
  *   - plugins/ 目录不存在 → scan_plugins() 返回空列表
- *   - 无效 .so → 跳过并记录 warn 日志, 不崩溃
+ *   - 无效插件 → 跳过并记录 warn 日志, 不崩溃
  *   - 符号缺失 → 同上
  *
- * 集中隔离原则: 插件仅存在于 ~/.config/pcl-cgre/plugins/
+ * 集中隔离原则: 插件仅存在于配置目录下的 plugins/
  */
 class PluginRegistry {
 public:
     static PluginRegistry& instance();
 
     /**
-     * 扫描插件目录, 尝试 dlopen 每个 .so 并 dlsym 入口点
+     * 扫描插件目录, 尝试加载每个插件并获取入口点
      *
      * @return 成功加载的插件列表 (已排序去重)
      */
     std::vector<PluginDescriptor> scan_plugins();
 
     /**
-     * 仅扫描目录中的 .so 文件路径, 不执行 dlopen
+     * 仅扫描目录中的插件文件路径, 不执行加载
      *
-     * @return .so 文件路径列表
+     * @return 插件文件路径列表
      */
     std::vector<std::string> discover_files() const;
 
@@ -57,8 +57,8 @@ private:
     PluginRegistry(const PluginRegistry&) = delete;
     PluginRegistry& operator=(const PluginRegistry&) = delete;
 
-    /** 尝试加载单个 .so, 成功返回 PluginDescriptor */
-    PluginDescriptor try_load(const std::string& so_path);
+    /** 尝试加载单个插件, 成功返回 PluginDescriptor */
+    PluginDescriptor try_load(const std::string& plugin_path);
 };
 
 }  // namespace pcl

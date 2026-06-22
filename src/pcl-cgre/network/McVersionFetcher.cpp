@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -12,6 +13,8 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <limits.h>
 #include <unistd.h>
+#elif defined(_WIN32)
+#include <windows.h>
 #endif
 
 #include <thread>
@@ -64,7 +67,12 @@ time_t parse_iso8601(const char* str)
     tm.tm_mon -= 1;
     tm.tm_isdst = -1;
 
-    time_t t = timegm(&tm);
+    time_t t =
+#ifdef _WIN32
+        _mkgmtime(&tm);
+#else
+        timegm(&tm);
+#endif
     if (n >= 7) {
         int offset = tz_h * 3600 + tz_m * 60;
         if (tz_sign == '-') offset = -offset;
@@ -250,7 +258,7 @@ void fetch_version_manifest(ManifestCallback callback)
 
 namespace {
 
-/** Resolve the binary's own directory via /proc/self/exe. */
+/** Resolve the binary's own directory. */
 std::string resolve_binary_dir()
 {
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -263,6 +271,15 @@ std::string resolve_binary_dir()
         if (slash != std::string::npos)
             return exe.substr(0, slash);
     }
+#elif defined(_WIN32)
+    char buf[MAX_PATH];
+    DWORD len = GetModuleFileNameA(NULL, buf, MAX_PATH);
+    if (len > 0 && len < MAX_PATH) {
+        std::string exe(buf, len);
+        auto slash = exe.rfind('\\');
+        if (slash != std::string::npos)
+            return exe.substr(0, slash);
+    }
 #endif
     return {};
 }
@@ -270,7 +287,8 @@ std::string resolve_binary_dir()
 /** Check if a regular file exists at `path`. */
 static bool file_exists(const std::string& path)
 {
-    return access(path.c_str(), F_OK) == 0;
+    std::error_code ec;
+    return std::filesystem::exists(path, ec);
 }
 
 /** Find lirpa_loof.json using the same strategy as IconHelper. */

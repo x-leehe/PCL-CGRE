@@ -9,13 +9,15 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <limits.h>
 #include <unistd.h>
+#elif defined(_WIN32)
+#include <windows.h>
 #endif
 
 namespace pcl::font {
 
 namespace {
 
-/** Resolve the binary's own directory via /proc/self/exe. */
+/** Resolve the binary's own directory. */
 std::string resolve_binary_dir()
 {
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -25,6 +27,15 @@ std::string resolve_binary_dir()
         buf[len] = '\0';
         std::string exe(buf);
         auto slash = exe.rfind('/');
+        if (slash != std::string::npos)
+            return exe.substr(0, slash);
+    }
+#elif defined(_WIN32)
+    char buf[MAX_PATH];
+    DWORD len = GetModuleFileNameA(NULL, buf, MAX_PATH);
+    if (len > 0 && len < MAX_PATH) {
+        std::string exe(buf, len);
+        auto slash = exe.rfind('\\');
         if (slash != std::string::npos)
             return exe.substr(0, slash);
     }

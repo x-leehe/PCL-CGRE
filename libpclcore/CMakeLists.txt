@@ -13,6 +13,8 @@ target_include_directories(pclcore_objs PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_compile_options(pclcore_objs PRIVATE
-    -Wall -Wextra -Wpedantic
-)
+if(MSVC)
+    target_compile_options(pclcore_objs PRIVATE /W4)
+else()
+    target_compile_options(pclcore_objs PRIVATE -Wall -Wextra -Wpedantic)
+endif()

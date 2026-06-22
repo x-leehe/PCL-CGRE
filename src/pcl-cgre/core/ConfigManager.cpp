@@ -4,7 +4,7 @@
 
 #include <fstream>
 #include <cstdio>
-#include <sys/stat.h>
+#include <filesystem>
 #include <glib.h>
 
 namespace pcl {
@@ -242,8 +242,8 @@ void ConfigManager::init()
     std::string config_dir = dir.substr(0, slash);
 
     // 递归创建目录 (类似 mkdir -p)
-    std::string mkdir_cmd = "mkdir -p " + config_dir;
-    std::system(mkdir_cmd.c_str());
+    std::error_code ec;
+    std::filesystem::create_directories(config_dir, ec);
 
     std::ifstream ifs(dir);
     if (ifs.good()) {
@@ -298,8 +298,7 @@ void ConfigManager::save()
 
 std::string ConfigManager::config_path() const
 {
-    const char* home = g_get_home_dir();
-    return std::string(home) + "/.config/pcl-cgre/global.json";
+    return std::string(g_get_user_config_dir()) + "/pcl-cgre/global.json";
 }
 
 nlohmann::json ConfigManager::make_default_config()
